@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-connection = sqlite3.connect("tasks.db")
+connection = sqlite3.connect("tasks.db", check_same_thread=False)
 
 connection.execute(
     """CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL)"""
@@ -60,16 +60,24 @@ def health_check():
 
 @app.get("/tasks", description="Get all tasks")
 def get_tasks():
-    return tasks
+    cursor = connection.execute("SELECT * FROM tasks")
+
+    rows = cursor.fetchall()
+
+    return [{"id": row[0], "title": row[1], "done": bool(row[2])} for row in rows]
 
 
 @app.get("/tasks/{id}", description="Get one task")
 def get_task(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            return task
 
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    cursor = connection.execute("SELECT * FROM tasks WHERE id = ?", (id,))
+
+    row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {"id": row[0], "title": row[1], "done": bool(row[2])}
 
 
 @app.post("/tasks", status_code=201, description="Create a task")
