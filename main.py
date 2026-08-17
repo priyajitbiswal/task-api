@@ -85,13 +85,15 @@ def create_task(task: TaskCreate):
     if not task.title or not task.title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-    next_id = max(t["id"] for t in tasks) + 1
+    cursor = connection.execute(
+        "INSERT INTO tasks (title, done) VALUES (?, ?)", (task.title, 0)
+    )
 
-    new_task = {"id": next_id, "title": task.title, "done": False}
+    connection.commit()
 
-    tasks.append(new_task)
+    new_id = cursor.lastrowid
 
-    return new_task
+    return {"id": new_id, "title": task.title, "done": False}
 
 
 @app.put("/tasks/{id}", description="Update a task")
