@@ -1,42 +1,11 @@
-import sqlite3
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+import database
+
 app = FastAPI()
 
-connection = sqlite3.connect("tasks.db", check_same_thread=False)
-
-connection.execute(
-    """CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL)"""
-)
-
-connection.commit()
-
-result = connection.execute("SELECT COUNT(*) FROM tasks")
-count = result.fetchone()[0]
-
-if count == 0:
-    connection.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)", ("Learn FastAPI", 0)
-    )
-
-    connection.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)", ("Build a CRUD API", 0)
-    )
-
-    connection.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)", ("Test the API", 1)
-    )
-
-    connection.commit()
-
-
-# tasks = [
-#     {"id": 1, "title": "Learn FastAPI", "done": False},
-#     {"id": 2, "title": "Build a CRUD API", "done": False},
-#     {"id": 3, "title": "Test the API", "done": True},
-# ]
+database.init_db()
 
 
 class TaskCreate(BaseModel):
@@ -60,9 +29,7 @@ def health_check():
 
 @app.get("/tasks", description="Get all tasks")
 def get_tasks():
-    cursor = connection.execute("SELECT * FROM tasks")
-
-    rows = cursor.fetchall()
+    rows = database.get_all_tasks()
 
     return [{"id": row[0], "title": row[1], "done": bool(row[2])} for row in rows]
 
@@ -70,9 +37,7 @@ def get_tasks():
 @app.get("/tasks/{id}", description="Get one task")
 def get_task(id: int):
 
-    cursor = connection.execute("SELECT * FROM tasks WHERE id = ?", (id,))
-
-    row = cursor.fetchone()
+    row = database.get_task(id)
 
     if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -85,13 +50,7 @@ def create_task(task: TaskCreate):
     if not task.title or not task.title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-    cursor = connection.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)", (task.title, 0)
-    )
-
-    connection.commit()
-
-    new_id = cursor.lastrowid
+    new_id = database.create_task(task.title)
 
     return {"id": new_id, "title": task.title, "done": False}
 
@@ -100,12 +59,15 @@ def create_task(task: TaskCreate):
 def update_task(id: int, task_update: TaskUpdate):
 
     if task_update.title is None and task_update.done is None:
-        raise HTTPException(status_code=400, detail="Update must contain title or done")
+        raise HTTPException(
+            status_code=400,
+            detail="Update must contain title or done",
+        )
 
     if task_update.title is not None and not task_update.title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-    existing = connection.execute("SELECT * FROM tasks WHERE id = ?", (id,)).fetchone()
+    existing = database.get_task(id)
 
     if existing is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -114,11 +76,7 @@ def update_task(id: int, task_update: TaskUpdate):
 
     done = task_update.done if task_update.done is not None else bool(existing[2])
 
-    connection.execute(
-        "UPDATE tasks SET title = ?, done = ? WHERE id = ?", (title, int(done), id)
-    )
-
-    connection.commit()
+    database.update_task(id, title, done)
 
     return {"id": id, "title": title, "done": done}
 
@@ -126,11 +84,7 @@ def update_task(id: int, task_update: TaskUpdate):
 @app.delete("/tasks/{id}", status_code=204, description="Delete a task")
 def delete_task(id: int):
 
-    cursor = connection.execute("DELETE FROM tasks WHERE id = ?", (id,))
+    deleted = database.delete_task(id)
 
-    connection.commit()
-
-    if cursor.rowcount == 0:
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    return
