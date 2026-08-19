@@ -88,3 +88,5 @@ def delete_task(id: int):
 
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Task not found")
+    
+    return
