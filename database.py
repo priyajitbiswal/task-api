@@ -62,24 +62,27 @@ def create_task(title):
             """
             INSERT INTO tasks (title, done)
             VALUES (%s, %s)
-            RETURNING id
+            RETURNING id, title, done
             """,
             (title, False),
         )
-    return cursor.fetchone()[0]
+
+        return cursor.fetchone()
 
 
 def update_task(task_id, title, done):
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
-                UPDATE tasks
-                SET title = %s, done = %s
-                WHERE id = %s
-                """,
+            UPDATE tasks
+            SET title = %s, done = %s
+            WHERE id = %s
+            RETURNING id, title, done
+            """,
             (title, done, task_id),
         )
-        return cursor.rowcount
+
+        return cursor.fetchone()
 
 
 def delete_task(task_id):
@@ -88,4 +91,5 @@ def delete_task(task_id):
             "DELETE FROM tasks WHERE id = %s",
             (task_id,),
         )
+
         return cursor.rowcount

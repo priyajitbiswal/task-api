@@ -31,7 +31,10 @@ def health_check():
 def get_tasks():
     rows = database.get_all_tasks()
 
-    return [{"id": row[0], "title": row[1], "done": bool(row[2])} for row in rows]
+    return [
+        {"id": row[0], "title": row[1], "done": bool(row[2])}
+        for row in rows
+    ]
 
 
 @app.get("/tasks/{id}", description="Get one task")
@@ -42,17 +45,29 @@ def get_task(id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    return {"id": row[0], "title": row[1], "done": bool(row[2])}
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": bool(row[2]),
+    }
 
 
 @app.post("/tasks", status_code=201, description="Create a task")
 def create_task(task: TaskCreate):
+
     if not task.title or not task.title.strip():
-        raise HTTPException(status_code=400, detail="Title cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail="Title cannot be empty",
+        )
 
-    new_id = database.create_task(task.title)
+    row = database.create_task(task.title)
 
-    return {"id": new_id, "title": task.title, "done": False}
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": row[2],
+    }
 
 
 @app.put("/tasks/{id}", description="Update a task")
@@ -65,20 +80,38 @@ def update_task(id: int, task_update: TaskUpdate):
         )
 
     if task_update.title is not None and not task_update.title.strip():
-        raise HTTPException(status_code=400, detail="Title cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail="Title cannot be empty",
+        )
 
     existing = database.get_task(id)
 
     if existing is None:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
 
-    title = task_update.title if task_update.title is not None else existing[1]
+    title = (
+        task_update.title
+        if task_update.title is not None
+        else existing[1]
+    )
 
-    done = task_update.done if task_update.done is not None else bool(existing[2])
+    done = (
+        task_update.done
+        if task_update.done is not None
+        else bool(existing[2])
+    )
 
-    database.update_task(id, title, done)
+    row = database.update_task(id, title, done)
 
-    return {"id": id, "title": title, "done": done}
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": row[2],
+    }
 
 
 @app.delete("/tasks/{id}", status_code=204, description="Delete a task")
@@ -87,6 +120,9 @@ def delete_task(id: int):
     deleted = database.delete_task(id)
 
     if deleted == 0:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
     return
